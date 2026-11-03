@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Quote Threads",
+    "description": "Ask about selected answer text in persistent child conversations, with a collapsible thread tree and a sidebar quote map."
+  }
+}
