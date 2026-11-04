@@ -34,3 +34,7 @@ node --test host.test.mjs
 ```
 
 测试覆盖引用记录编解码、日志边界、输入校验、真实母回答校验、创建调用形状和多层树重建。
+
+## 插件开发复盘
+
+本次实现中验证过的 Slot 选择、`seq` 定位、选区保存、子会话恢复、流式事件、布局变量、原生 Markdown/LaTeX 和发布流程，整理在 [DEVELOPMENT.md](DEVELOPMENT.md)。
