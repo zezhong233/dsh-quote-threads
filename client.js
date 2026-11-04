@@ -125,6 +125,7 @@ window.__ModuleLoader__.load({
       .qt-composer{box-sizing:border-box;width:calc(100% - var(--dsh-composer-side-clearance) - var(--dsh-composer-side-clearance));max-width:var(--dsh-composer-card-max-width);align-self:center;margin:8px auto;padding:12px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg);background:var(--dsw-alias-bg-layer-2);box-shadow:var(--dsw-elevation-soft);font-size:var(--dsh-content-font-size-secondary,13px);line-height:1.55;display:flex;flex-direction:column;gap:10px}
       .qt-quote{border-left:3px solid var(--dsw-alias-state-business-primary);border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-interactive-bg-hover);padding:6px 10px;color:var(--dsw-alias-label-primary);font-size:inherit;white-space:pre-wrap;overflow-wrap:anywhere;max-height:120px;overflow:auto}
       .qt-quote-label{font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary);margin-bottom:4px}
+      .qt-quote-markdown{white-space:normal}
       .qt-input{box-sizing:border-box;width:100%;min-height:74px;resize:vertical;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);background:var(--dsw-specific-input-major);color:var(--dsw-alias-label-primary);padding:9px 11px;font:inherit;line-height:1.5}
       .qt-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
       .qt-spacer{flex:1}
@@ -286,10 +287,43 @@ window.__ModuleLoader__.load({
       throw new Error('sourceNotFound')
     }
 
+    function serializeSelectionNode(node) {
+      if (node.nodeType === 3) return node.nodeValue ?? ''
+      if (node.nodeType !== 1 && node.nodeType !== 11) return ''
+      if (node.nodeType === 1) {
+        const element = node
+        if (element.classList.contains('katex')) {
+          const annotation = element.querySelector('annotation[encoding="application/x-tex"]')
+          const tex = annotation?.textContent?.trim()
+          if (tex) return `$${tex}$`
+        }
+        if (element.tagName === 'BR') return '\n'
+      }
+      const content = Array.from(node.childNodes ?? []).map(serializeSelectionNode).join('')
+      if (node.nodeType !== 1) return content
+      const block = /^(ADDRESS|ARTICLE|ASIDE|BLOCKQUOTE|DD|DIV|DL|DT|FIGCAPTION|FIGURE|FOOTER|H[1-6]|HEADER|LI|MAIN|P|PRE|SECTION|TABLE|TD|TH|TR)$/
+      return block.test(node.tagName) ? `\n${content}\n` : content
+    }
+
+    function selectionText(selection) {
+      let text = ''
+      try {
+        text = serializeSelectionNode(selection.getRangeAt(0).cloneContents())
+      } catch {
+        text = ''
+      }
+      if (!text.trim()) text = selection.toString()
+      return text
+        .replace(/\r\n?/g, '\n')
+        .replace(/[\u00a0\u2002\u2003\u2007\u2009\u202f]/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    }
+
     function captureSelection(source) {
       const selection = window.getSelection()
       if (!selection || selection.rangeCount === 0 || selection.isCollapsed) throw new Error('emptySelection')
-      const quote = selection.toString().trim()
+      const quote = selectionText(selection)
       if (!quote) throw new Error('emptySelection')
       const start = source.answer.indexOf(quote)
       source.source.start = start >= 0 ? start : null
@@ -373,7 +407,12 @@ window.__ModuleLoader__.load({
         h(Style),
         h('div', { className: 'qt-quote' },
           h('div', { className: 'qt-quote-label' }, t('selectedText')),
-          draft.quote,
+          h('div', { className: 'qt-quote-markdown' }, h(MarkdownText, {
+            text: draft.quote,
+            streaming: false,
+            labels: markdownLabels(t),
+            variant: 'compact',
+          })),
         ),
         h('textarea', {
           ref: inputRef,
@@ -528,7 +567,12 @@ window.__ModuleLoader__.load({
         ),
         h('div', { className: 'qt-quote', style: { marginTop: '10px' } },
           h('div', { className: 'qt-quote-label' }, t('selectedText')),
-          node.quote,
+          h('div', { className: 'qt-quote-markdown' }, h(MarkdownText, {
+            text: node.quote,
+            streaming: false,
+            labels: markdownCopy,
+            variant: 'compact',
+          })),
         ),
         h('div', { className: 'qt-thread-question' },
           h('span', { className: 'qt-question-label' }, t('you')),
@@ -655,6 +699,7 @@ window.__ModuleLoader__.load({
     }
 
     return {
+      __testing: { selectionText, serializeSelectionNode },
       inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'locale'],
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, dictionaries), 'quote-threads: dictionaries')

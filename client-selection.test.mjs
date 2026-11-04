@@ -1,0 +1,71 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import vm from 'node:vm'
+
+let definition
+const window = {
+  __ModuleLoader__: {
+    load(value) {
+      definition = value
+    },
+  },
+}
+vm.runInNewContext(fs.readFileSync(new URL('./client.js', import.meta.url), 'utf8'), { window })
+const React = { createElement: () => null }
+const api = definition.factory((name) => {
+  if (name === 'react') return React
+  if (name === '@deepseek-ai/dsh-client-ui-primitives') return { MarkdownText: () => null }
+  throw new Error(`Unexpected module: ${name}`)
+})
+const { selectionText } = api.__testing
+
+function text(value) {
+  return { nodeType: 3, nodeValue: value }
+}
+
+function element(tagName, children, classes = [], tex = null) {
+  return {
+    nodeType: 1,
+    tagName,
+    childNodes: children,
+    classList: { contains: (name) => classes.includes(name) },
+    querySelector: () => tex === null ? null : { textContent: tex },
+  }
+}
+
+function selection(fragment, fallback = 'fallback') {
+  return {
+    getRangeAt: () => ({ cloneContents: () => fragment }),
+    toString: () => fallback,
+  }
+}
+
+test('KaTeX selection emits one TeX expression without duplicated visual math', () => {
+  const first = element('SPAN', [text('[ O I I ] λ 3727 [OII]λ3727')], ['katex'], '\\mathrm{[OII]}\\lambda 3727')
+  const second = element('SPAN', [text('H α Hα')], ['katex'], 'H\\alpha')
+  const fragment = {
+    nodeType: 11,
+    childNodes: [text('观测到 '), first, text(' 和 '), second, text('。')],
+  }
+  assert.equal(
+    selectionText(selection(fragment)),
+    '观测到 $\\mathrm{[OII]}\\lambda 3727$ 和 $H\\alpha$。',
+  )
+})
+
+test('selection preserves paragraph boundaries and normalizes special spaces', () => {
+  const fragment = {
+    nodeType: 11,
+    childNodes: [
+      element('P', [text('第一段\u2009文字')]),
+      element('P', [text('第二段')]),
+    ],
+  }
+  assert.equal(selectionText(selection(fragment)), '第一段 文字\n\n第二段')
+})
+
+test('selection falls back to browser text when cloning yields no text', () => {
+  const fragment = { nodeType: 11, childNodes: [] }
+  assert.equal(selectionText(selection(fragment, '普通选区')), '普通选区')
+})

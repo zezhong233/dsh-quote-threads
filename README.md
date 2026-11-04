@@ -11,7 +11,7 @@
 5. 子问答下方可以继续提问；内联回答使用 DSH 原生 Markdown 渲染，支持 LaTeX。点击「打开完整对话」可进入原生 DSH 子会话，查看工具调用等完整内容。
 6. 左侧「引用地图」按层级列出当前工作区的引用会话。
 
-在子会话的原生完整对话中，也可以再次选中回答文字并创建下一层引用追问。
+在子会话的原生完整对话中，也可以再次选中回答文字并创建下一层引用追问。含 KaTeX 公式的选区会提取为单份 TeX，引用原文和问题回答都使用原生 Markdown 渲染，避免 MathML 与视觉字符重复断行。
 
 ## 数据与恢复
 
@@ -30,7 +30,7 @@
 ```bash
 node --check index.js
 node --check client.js
-node --test host.test.mjs
+node --test host.test.mjs client-selection.test.mjs
 ```
 
 测试覆盖引用记录编解码、日志边界、输入校验、真实母回答校验、创建调用形状和多层树重建。

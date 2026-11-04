@@ -61,6 +61,8 @@ for (const chatTurn of snapshot.timeline.turns.values()) {
 - [Verified 2026-11] Keep a small set of known, localized error keys and display unknown exception messages unchanged for diagnosis.
 - [Verified 2026-11] The final Client does not gate quoting on DOM-turn ancestry; it checks only that selected text is non-empty and records exact offsets when `answer.indexOf(quote)` succeeds, avoiding a presentation-internal dependency that was unnecessary for Host source verification.
 - [Verified 2026-11] Rendered Markdown can make selected text differ from the raw answer, so offsets must be optional rather than a second brittle DOM gate.
+- [Verified 2026-11] `Selection.toString()` on KaTeX can include MathML, visual glyphs, and accessibility text as duplicated multi-line fragments; serialize `Range.cloneContents()` and replace each `.katex` node with its `annotation[encoding="application/x-tex"]` as one `$...$` expression.
+- [Verified 2026-11] Render the extracted quote through `MarkdownText` as well as assistant answers; `client-selection.test.mjs` covers mixed text/formula extraction, paragraph boundaries, and the plain-text fallback.
 - [Verified 2026-11] The Host still verifies the parent session, assistant message, event sequence, answer text, and supplied offsets; relaxing Client selection validation did not remove source authentication.
 
 ## 6. Child sessions are durable DSH subagents
@@ -138,7 +140,7 @@ h(MarkdownText, {
 ```bash
 node --check index.js
 node --check client.js
-node --test host.test.mjs
+node --test host.test.mjs client-selection.test.mjs
 python3 -m json.tool package.json >/dev/null
 python3 -m json.tool locale/zh.json >/dev/null
 python3 -m json.tool locale/en.json >/dev/null
