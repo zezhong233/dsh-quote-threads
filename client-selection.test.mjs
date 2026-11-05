@@ -18,7 +18,7 @@ const api = definition.factory((name) => {
   if (name === '@deepseek-ai/dsh-client-ui-primitives') return { MarkdownText: () => null }
   throw new Error(`Unexpected module: ${name}`)
 })
-const { selectionText, quoteParts, highlightName } = api.__testing
+const { selectionText, quoteParts, highlightName, quoteOccurrence, quoteColor } = api.__testing
 
 function text(value) {
   return { nodeType: 3, nodeValue: value }
@@ -81,4 +81,19 @@ test('quote highlighting separates text and TeX parts', () => {
   ]))
   assert.equal(highlightName('quote-1'), highlightName('quote-1'))
   assert.notEqual(highlightName('quote-1'), highlightName('quote-2'))
+})
+
+test('quote occurrence follows the stored answer offset', () => {
+  const quote = '到 GitHub'
+  const answer = `${quote} 的一次提交，之后再次回${quote}。`
+  const start = answer.lastIndexOf(quote)
+  const node = { quote, source: { start, end: start + quote.length } }
+  assert.equal(quoteOccurrence(answer, node), 1)
+  assert.equal(quoteOccurrence(answer, { quote, source: { start: null, end: null } }), 0)
+})
+
+test('quote colors provide an ordered eight-color cycle', () => {
+  const colors = Array.from({ length: 8 }, (_, index) => quoteColor(index))
+  assert.equal(new Set(colors).size, 8)
+  assert.equal(quoteColor(8), quoteColor(0))
 })

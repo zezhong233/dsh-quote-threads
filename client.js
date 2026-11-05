@@ -140,14 +140,14 @@ window.__ModuleLoader__.load({
       .qt-quote-action{border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-weight:600;padding:6px 12px}
       .qt-quote-action:hover{border-color:var(--dsw-alias-label-tertiary);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
       .qt-thread-list{display:flex;flex-direction:column;gap:12px;margin-top:10px}
-      .qt-thread{box-sizing:border-box;width:100%;min-width:0;border:1px solid var(--dsw-alias-border-l2);border-left:3px solid var(--dsw-alias-state-business-primary);border-radius:var(--dsw-radius-lg);background:var(--dsw-alias-bg-layer-1);box-shadow:var(--dsw-elevation-soft);padding:13px;font-size:calc(var(--dsh-content-font-size,14px) - 1px);line-height:1.55}
+      .qt-thread{box-sizing:border-box;width:100%;min-width:0;border:1px solid var(--dsw-alias-border-l2);border-left:3px solid var(--qt-thread-color,var(--dsw-alias-state-business-primary));border-radius:var(--dsw-radius-lg);background:var(--dsw-alias-bg-layer-1);box-shadow:var(--dsw-elevation-soft);padding:13px;font-size:calc(var(--dsh-content-font-size,14px) - 1px);line-height:1.55}
       .qt-thread:not(.qt-thread-open){padding:10px 12px;box-shadow:none}
       .qt-thread-toggle{box-sizing:border-box;width:100%;border:0;background:transparent;color:var(--dsw-alias-label-primary);padding:2px 0;display:flex;align-items:flex-start;gap:8px;font:inherit;text-align:left;cursor:pointer}
-      .qt-thread-chevron{flex:none;width:14px;color:var(--dsw-alias-brand-primary);line-height:1.55}
+      .qt-thread-chevron{flex:none;width:14px;color:var(--qt-thread-color,var(--dsw-alias-brand-primary));line-height:1.55}
       .qt-thread-heading{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
       .qt-thread-kicker{color:var(--dsw-alias-label-tertiary);font-size:11px;font-weight:500}
-      .qt-thread-summary{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
-      .qt-thread-toggle:hover .qt-thread-summary{color:var(--dsw-alias-brand-primary)}
+      .qt-thread-summary{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--qt-thread-color,var(--dsw-alias-brand-primary))}
+      .qt-thread-toggle:hover .qt-thread-summary{color:var(--qt-thread-color,var(--dsw-alias-brand-primary))}
       .qt-thread-body{margin-top:10px;padding-top:10px;border-top:1px solid var(--dsw-alias-border-l1)}
       .qt-thread-question{margin:10px 0 0;padding:9px 11px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary);font-weight:600;white-space:pre-wrap;overflow-wrap:anywhere}
       .qt-question-label{display:block;margin-bottom:4px;color:var(--dsw-alias-label-secondary);font-size:11px;font-weight:600}
@@ -357,6 +357,35 @@ window.__ModuleLoader__.load({
 
     function highlightName(id) {
       return `qt-${highlightHash(id).toString(36)}`
+    }
+
+    function quoteOccurrence(answer, node) {
+      const { start, end } = node.source
+      if (start === null || start === undefined || end !== start + node.quote.length || answer.slice(start, end) !== node.quote) return 0
+      let occurrence = 0
+      let from = 0
+      while (from < start) {
+        const at = answer.indexOf(node.quote, from)
+        if (at < 0 || at >= start) break
+        occurrence += 1
+        from = at + node.quote.length
+      }
+      return occurrence
+    }
+
+    const highlightColors = [
+      'var(--dsw-alias-brand-primary)',
+      'color-mix(in oklab, var(--dsw-alias-brand-primary) 55%, var(--dsw-alias-state-success-primary))',
+      'var(--dsw-alias-state-success-primary)',
+      'color-mix(in oklab, var(--dsw-alias-state-success-primary) 45%, var(--dsw-alias-state-warn-primary))',
+      'var(--dsw-alias-state-warn-primary)',
+      'color-mix(in oklab, var(--dsw-alias-state-warn-primary) 45%, var(--dsw-alias-state-error-primary))',
+      'var(--dsw-alias-state-error-primary)',
+      'color-mix(in oklab, var(--dsw-alias-state-error-primary) 45%, var(--dsw-alias-brand-primary))',
+    ]
+
+    function quoteColor(index) {
+      return highlightColors[index % highlightColors.length]
     }
 
     function captureSelection(source) {
@@ -570,7 +599,7 @@ window.__ModuleLoader__.load({
       }
     }
 
-    function ChildThread({ node, rootSessionId, pluginCtx: ctx, t }) {
+    function ChildThread({ node, rootSessionId, pluginCtx: ctx, t, color }) {
       const tree = useTree(rootSessionId)
       const threadKey = `${rootSessionId}:thread:${node.childId}`
       const open = useExpanded(threadKey)
@@ -601,7 +630,7 @@ window.__ModuleLoader__.load({
           setBusy(false)
         }
       }
-      return h('article', { className: `qt-thread${open ? ' qt-thread-open' : ''}`, 'data-quote-thread': node.id },
+      return h('article', { className: `qt-thread${open ? ' qt-thread-open' : ''}`, 'data-quote-thread': node.id, style: { '--qt-thread-color': color ?? quoteColor(0) } },
         h('button', {
           type: 'button',
           className: 'qt-thread-toggle',
@@ -611,7 +640,7 @@ window.__ModuleLoader__.load({
         h('span', { className: 'qt-thread-chevron', 'aria-hidden': true }, open ? '▾' : '▸'),
         h('span', { className: 'qt-thread-heading' },
           h('span', { className: 'qt-thread-kicker' }, `${node.depth > 1 ? t('nested') : t('quoteAsk')} · L${node.depth}`),
-          h('span', { className: 'qt-thread-summary' }, node.question || node.quote),
+          h('span', { className: 'qt-thread-summary', title: node.quote }, node.quote || node.question),
         )),
         open ? h('div', { className: 'qt-thread-body' },
         h('div', { className: 'qt-row' },
@@ -670,7 +699,7 @@ window.__ModuleLoader__.load({
             h('span', null, showNested ? '▾' : '▸'),
             `${children.length} ${t('childThreads')}`,
           ),
-          showNested ? h('div', { className: 'qt-thread-list' }, children.map((child) => h(ChildThread, { key: child.childId, node: child, rootSessionId, pluginCtx: ctx, t }))) : null,
+          showNested ? h('div', { className: 'qt-thread-list' }, children.map((child, index) => h(ChildThread, { key: child.childId, node: child, rootSessionId, pluginCtx: ctx, t, color: quoteColor(index) }))) : null,
         ) : null,
         ) : null,
       )
@@ -708,19 +737,28 @@ window.__ModuleLoader__.load({
       return { normalized, points }
     }
 
-    function findTextRange(indexes, text) {
+    function findTextRange(indexes, text, occurrence = 0) {
       const needle = text.replace(/\s+/g, ' ').trim()
       if (!needle) return null
+      let remaining = occurrence
       for (const index of indexes) {
-        const at = index.normalized.indexOf(needle)
-        if (at < 0) continue
-        const start = index.points[at]
-        const end = index.points[at + needle.length - 1]
-        if (!start || !end) continue
-        const range = document.createRange()
-        range.setStart(start.node, start.offset)
-        range.setEnd(end.node, end.offset + 1)
-        return range
+        let from = 0
+        while (from < index.normalized.length) {
+          const at = index.normalized.indexOf(needle, from)
+          if (at < 0) break
+          if (remaining > 0) {
+            remaining -= 1
+            from = at + needle.length
+            continue
+          }
+          const start = index.points[at]
+          const end = index.points[at + needle.length - 1]
+          if (!start || !end) return null
+          const range = document.createRange()
+          range.setStart(start.node, start.offset)
+          range.setEnd(end.node, end.offset + 1)
+          return range
+        }
       }
       return null
     }
@@ -752,10 +790,12 @@ window.__ModuleLoader__.load({
           for (const node of nodes) {
             const name = highlightName(node.id)
             const ranges = []
-            for (const part of quoteParts(node.quote)) {
+            const parts = quoteParts(node.quote)
+            const occurrence = parts.length === 1 && parts[0]?.kind === 'text' ? node.highlightOccurrence ?? 0 : 0
+            for (const part of parts) {
               const range = part.kind === 'math'
                 ? findMathRange(rows, part.value)
-                : findTextRange(indexes, part.value)
+                : findTextRange(indexes, part.value, occurrence)
               if (range) ranges.push(range)
             }
             if (ranges.length) window.CSS.highlights.set(name, new window.Highlight(...ranges))
@@ -780,14 +820,22 @@ window.__ModuleLoader__.load({
       }, [ref, nodes])
     }
 
-    function QuoteTail({ seq, sessionId, useProjection, pluginCtx: ctx, t }) {
+    function QuoteTail({ seq, sessionId, useChat, useProjection, pluginCtx: ctx, t }) {
       const catalog = useProjection('subagentCatalog')
+      const chatSnapshot = useChat(useCallback((snapshot) => snapshot, []))
       const tree = useTree(sessionId)
       const key = `${sessionId}:seq:${seq}`
       const open = useExpanded(key)
       const nodes = tree.nodes.filter((node) => node.parentId === sessionId && node.source.parentSeq === seq)
+      let answer = ''
+      try {
+        answer = sourceFromChat(chatSnapshot, sessionId, seq).answer
+      } catch {
+        answer = ''
+      }
+      const highlightNodes = nodes.map((node) => ({ ...node, highlightOccurrence: quoteOccurrence(answer, node) }))
       const tailRef = useRef(null)
-      useQuoteHighlights(tailRef, nodes)
+      useQuoteHighlights(tailRef, highlightNodes)
       useEffect(() => {
         lastSessionId = sessionId
       }, [sessionId])
@@ -795,13 +843,7 @@ window.__ModuleLoader__.load({
         if (catalog !== undefined) void refreshTree(sessionId)
       }, [catalog, sessionId])
       if (!nodes.length) return null
-      const palette = [
-        '--dsw-alias-brand-primary',
-        '--dsw-alias-state-success-primary',
-        '--dsw-alias-state-warn-primary',
-        '--dsw-alias-state-error-primary',
-      ]
-      const highlightStyles = nodes.map((node) => `::highlight(${highlightName(node.id)}){text-decoration-line:underline;text-decoration-color:var(${palette[highlightHash(node.id) % palette.length]});text-decoration-thickness:2px;text-underline-offset:3px}`).join('\n')
+      const highlightStyles = nodes.map((node, index) => `::highlight(${highlightName(node.id)}){text-decoration-line:underline;text-decoration-color:${quoteColor(index)};text-decoration-thickness:2px;text-underline-offset:3px}`).join('\n')
       return h('section', { className: 'qt-tail', ref: tailRef },
         h('style', null, highlightStyles),
         h(Style),
@@ -809,7 +851,7 @@ window.__ModuleLoader__.load({
           h('span', null, open ? '▾' : '▸'),
           `${nodes.length} ${t('threads')}`,
         ),
-        open ? h('div', { className: 'qt-thread-list' }, nodes.map((node) => h(ChildThread, { key: node.childId, node, rootSessionId: sessionId, pluginCtx: ctx, t }))) : null,
+        open ? h('div', { className: 'qt-thread-list' }, nodes.map((node, index) => h(ChildThread, { key: node.childId, node, rootSessionId: sessionId, pluginCtx: ctx, t, color: quoteColor(index) }))) : null,
       )
     }
 
@@ -867,7 +909,7 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      __testing: { selectionText, serializeSelectionNode, quoteParts, highlightHash, highlightName },
+      __testing: { selectionText, serializeSelectionNode, quoteParts, highlightHash, highlightName, quoteOccurrence, quoteColor },
       inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'locale'],
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, dictionaries), 'quote-threads: dictionaries')

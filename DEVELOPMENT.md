@@ -136,11 +136,12 @@ h(MarkdownText, {
 ## 10. Decorate quoted source text without changing Markdown DOM
 
 - [Verified 2026-11] The CSS Custom Highlight API can underline `Range` objects without wrapping them in new spans, avoiding damage to React-owned Markdown and KaTeX DOM.
-- [Verified 2026-11] Scope highlight lookup to siblings of the current turn-tail row through its actual `data-chat-turn` container; do not reintroduce the discarded owner-turn/internal-turn comparison.
+- [Verified 2026-11] Scope highlight lookup to assistant-response siblings of the current turn-tail row through its actual `data-chat-turn` container; do not reintroduce the discarded owner-turn/internal-turn comparison.
 - [Verified 2026-11] Split each stored quote into plain-text and TeX parts; match text with whitespace-normalized text-node ranges and match TeX against each KaTeX annotation before selecting the whole formula node.
-- [Verified 2026-11] Use one named highlight per quote and a theme-token color palette; `quoteParts()` and stable highlight names are covered in `client-selection.test.mjs`.
+- [Verified 2026-11] The first DOM match is wrong for repeated phrases; recover the occurrence ordinal from the stored raw-answer offset and skip that many matches, which also repairs existing records without a schema change.
+- [Verified 2026-11] Use one named highlight per quote and an ordered eight-color OKLCH-mixed theme palette; folded quote summaries, card borders, and chevrons use the same indexed color. Tests cover `quoteParts()`, stable names, occurrence ordinals, and the color cycle.
 - [Verified 2026-11] Rebuild ranges through a `MutationObserver` because Chat virtualization and React updates can replace the original text nodes; delete owned highlights during effect cleanup.
-- [Verified 2026-11] Default each inline child card to a compact question summary and retain its child session only when that card is expanded, preventing a long answer with many quotes from mounting every conversation at once.
+- [Verified 2026-11] Default each inline child card to a compact quoted-text summary and retain its child session only when that card is expanded, preventing a long answer with many quotes from mounting every conversation at once.
 
 ## 11. Verification and publication checklist
 
