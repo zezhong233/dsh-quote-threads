@@ -374,14 +374,14 @@ window.__ModuleLoader__.load({
     }
 
     const highlightColors = [
-      'var(--dsw-alias-brand-primary)',
-      'color-mix(in oklab, var(--dsw-alias-brand-primary) 55%, var(--dsw-alias-state-success-primary))',
-      'var(--dsw-alias-state-success-primary)',
-      'color-mix(in oklab, var(--dsw-alias-state-success-primary) 45%, var(--dsw-alias-state-warn-primary))',
-      'var(--dsw-alias-state-warn-primary)',
-      'color-mix(in oklab, var(--dsw-alias-state-warn-primary) 45%, var(--dsw-alias-state-error-primary))',
-      'var(--dsw-alias-state-error-primary)',
       'color-mix(in oklab, var(--dsw-alias-state-error-primary) 45%, var(--dsw-alias-brand-primary))',
+      'var(--dsw-alias-state-error-primary)',
+      'color-mix(in oklab, var(--dsw-alias-state-warn-primary) 45%, var(--dsw-alias-state-error-primary))',
+      'var(--dsw-alias-state-warn-primary)',
+      'color-mix(in oklab, var(--dsw-alias-state-success-primary) 45%, var(--dsw-alias-state-warn-primary))',
+      'var(--dsw-alias-state-success-primary)',
+      'color-mix(in oklab, var(--dsw-alias-brand-primary) 55%, var(--dsw-alias-state-success-primary))',
+      'var(--dsw-alias-brand-primary)',
     ]
 
     function quoteColor(index) {
