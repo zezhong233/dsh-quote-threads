@@ -18,7 +18,7 @@ const api = definition.factory((name) => {
   if (name === '@deepseek-ai/dsh-client-ui-primitives') return { MarkdownText: () => null }
   throw new Error(`Unexpected module: ${name}`)
 })
-const { selectionText } = api.__testing
+const { selectionText, quoteParts, highlightName } = api.__testing
 
 function text(value) {
   return { nodeType: 3, nodeValue: value }
@@ -68,4 +68,17 @@ test('selection preserves paragraph boundaries and normalizes special spaces', (
 test('selection falls back to browser text when cloning yields no text', () => {
   const fragment = { nodeType: 11, childNodes: [] }
   assert.equal(selectionText(selection(fragment, '普通选区')), '普通选区')
+})
+
+test('quote highlighting separates text and TeX parts', () => {
+  const parts = quoteParts('观测到 $\\mathrm{[OII]}\\lambda 3727$ 和\n$H\\alpha$。')
+  assert.equal(JSON.stringify(parts), JSON.stringify([
+    { kind: 'text', value: '观测到' },
+    { kind: 'math', value: '\\mathrm{[OII]}\\lambda 3727' },
+    { kind: 'text', value: '和' },
+    { kind: 'math', value: 'H\\alpha' },
+    { kind: 'text', value: '。' },
+  ]))
+  assert.equal(highlightName('quote-1'), highlightName('quote-1'))
+  assert.notEqual(highlightName('quote-1'), highlightName('quote-2'))
 })
