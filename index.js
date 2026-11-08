@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-export const inject = ['webServer', 'subagents', 'sessionController', 'sessionPersistence', 'sessionQuery', 'agents']
+export const inject = ['webServer', 'connection', 'subagents', 'sessionController', 'sessionPersistence', 'sessionQuery', 'agents']
 
 const MARKER_START = '[[DSH_QUOTE_THREAD_V1]]'
 const MARKER_END = '[[/DSH_QUOTE_THREAD_V1]]'
@@ -119,10 +119,7 @@ function authorize(ctx, req, res) {
     fail(res, 403, 'missing plugin request marker')
     return false
   }
-  const origin = req.headers.origin
-  const fetchSite = req.headers['sec-fetch-site']
-  const expected = ctx.webServer.getOrigin()
-  if ((origin !== undefined && origin !== expected) || (origin === undefined && fetchSite !== undefined && fetchSite !== 'same-origin')) {
+  if (!ctx.connection.isTrusted(req)) {
     fail(res, 403, 'cross-origin request rejected')
     return false
   }
@@ -277,6 +274,7 @@ export function apply(ctx) {
 }
 
 export const __testing = {
+  authorize,
   buildTree,
   cleanCreateInput,
   createThread,

@@ -2,6 +2,31 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { __testing } from './index.js'
 
+function authorizationResult(trusted, headers = {}) {
+  const req = {
+    method: 'POST',
+    headers: {
+      'x-dsh-quote-threads': '1',
+      host: '127.0.0.1:54321',
+      origin: 'http://127.0.0.1:54321',
+      'sec-fetch-site': 'same-origin',
+      ...headers,
+    },
+  }
+  const res = {
+    statusCode: 200,
+    headers: {},
+    payload: undefined,
+    setHeader(name, value) { this.headers[name] = value },
+    end(value) { this.payload = JSON.parse(value) },
+  }
+  const ctx = {
+    connection: { isTrusted: (request) => request === req && trusted },
+    webServer: { getOrigin: () => { throw new Error('fixed listener origin must not be consulted') } },
+  }
+  return { accepted: __testing.authorize(ctx, req, res), res }
+}
+
 const input = {
   source: {
     parentSessionId: 'parent-session',
@@ -15,6 +40,24 @@ const input = {
   quote: '需要解释的句子',
   question: '这句话为什么成立？',
 }
+
+test('authorization uses the deployment-aware Host and Origin trust fence', () => {
+  const remote = authorizationResult(true)
+  assert.equal(remote.accepted, true)
+  assert.equal(remote.res.statusCode, 200)
+
+  const rejected = authorizationResult(false)
+  assert.equal(rejected.accepted, false)
+  assert.equal(rejected.res.statusCode, 403)
+  assert.equal(rejected.res.payload.error, 'cross-origin request rejected')
+})
+
+test('authorization still requires the plugin request marker', () => {
+  const missing = authorizationResult(true, { 'x-dsh-quote-threads': undefined })
+  assert.equal(missing.accepted, false)
+  assert.equal(missing.res.statusCode, 403)
+  assert.equal(missing.res.payload.error, 'missing plugin request marker')
+})
 
 test('initial prompt preserves a versioned, recoverable quote record', () => {
   const prompt = __testing.formatInitialPrompt(input)
