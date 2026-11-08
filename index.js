@@ -120,8 +120,20 @@ function authorize(ctx, req, res) {
     return false
   }
   if (!ctx.connection.isTrusted(req)) {
-    fail(res, 403, 'cross-origin request rejected')
-    return false
+    const { origin, ...headers } = req.headers
+    const proxiedSameOrigin = req.headers['sec-fetch-site'] === 'same-origin'
+      && ctx.connection.isTrusted({ ...req, headers })
+    if (!proxiedSameOrigin) {
+      console.warn(`[quote-threads] rejected request ${JSON.stringify({
+        host: req.headers.host,
+        origin,
+        fetchSite: req.headers['sec-fetch-site'],
+        forwardedHost: req.headers['x-forwarded-host'],
+        forwardedProto: req.headers['x-forwarded-proto'],
+      })}`)
+      fail(res, 403, 'cross-origin request rejected')
+      return false
+    }
   }
   return true
 }

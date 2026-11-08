@@ -21,7 +21,9 @@ function authorizationResult(trusted, headers = {}) {
     end(value) { this.payload = JSON.parse(value) },
   }
   const ctx = {
-    connection: { isTrusted: (request) => request === req && trusted },
+    connection: {
+      isTrusted: (request) => typeof trusted === 'function' ? trusted(request) : request === req && trusted,
+    },
     webServer: { getOrigin: () => { throw new Error('fixed listener origin must not be consulted') } },
   }
   return { accepted: __testing.authorize(ctx, req, res), res }
@@ -50,6 +52,27 @@ test('authorization uses the deployment-aware Host and Origin trust fence', () =
   assert.equal(rejected.accepted, false)
   assert.equal(rejected.res.statusCode, 403)
   assert.equal(rejected.res.payload.error, 'cross-origin request rejected')
+})
+
+test('authorization accepts a same-origin proxy only when its Host remains trusted', () => {
+  const proxied = authorizationResult((request) => request.headers.origin === undefined
+    && request.headers.host === '127.0.0.1:13080'
+    && request.headers['sec-fetch-site'] === 'same-origin', {
+    host: '127.0.0.1:13080',
+    origin: 'http://127.0.0.1:54321',
+  })
+  assert.equal(proxied.accepted, true)
+  assert.equal(proxied.res.statusCode, 200)
+
+  const crossSite = authorizationResult((request) => request.headers.origin === undefined, {
+    'sec-fetch-site': 'cross-site',
+  })
+  assert.equal(crossSite.accepted, false)
+  assert.equal(crossSite.res.statusCode, 403)
+
+  const untrustedHost = authorizationResult(false)
+  assert.equal(untrustedHost.accepted, false)
+  assert.equal(untrustedHost.res.statusCode, 403)
 })
 
 test('authorization still requires the plugin request marker', () => {
