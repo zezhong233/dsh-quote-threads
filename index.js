@@ -155,6 +155,16 @@ function chooseProvider(subagents) {
   return 'spawn'
 }
 
+async function inspectSession(ctx, sessionId) {
+  if (typeof ctx.sessionController.inspect === 'function') return ctx.sessionController.inspect(sessionId)
+  const snapshot = await ctx.sessionQuery.readSession(sessionId)
+  return {
+    meta: snapshot.session,
+    events: snapshot.events,
+    inheritedEventCount: snapshot.inheritedEventCount,
+  }
+}
+
 async function waitForInitialMessage(ctx, childId, messageId) {
   let dispose = () => {}
   let timer
@@ -170,7 +180,7 @@ async function waitForInitialMessage(ctx, childId, messageId) {
         if (session.id === childId && check([event])) resolve()
       }, { global: true })
       timer = setTimeout(() => reject(new Error('子会话首条消息写入超时，请稍后刷新引用地图')), 10000)
-      void ctx.sessionController.inspect(childId).then((inspected) => {
+      void inspectSession(ctx, childId).then((inspected) => {
         if (check(inspected.events)) resolve()
       }, reject)
     })
@@ -183,7 +193,7 @@ async function waitForInitialMessage(ctx, childId, messageId) {
 async function resolveParent(ctx, parentId) {
   const live = ctx.agents.get(parentId)
   if (live !== undefined) return live
-  const inspected = await ctx.sessionController.inspect(parentId)
+  const inspected = await inspectSession(ctx, parentId)
   if (inspected.meta?.origin === 'subagent') throw new Error('请先打开这条子会话，再在其中创建嵌套引用')
   const found = await ctx.sessionController.resolveAgent(parentId)
   if (found?.error) throw new Error(found.error.message ?? '无法恢复母会话')
@@ -194,7 +204,7 @@ async function resolveParent(ctx, parentId) {
 
 async function verifySource(ctx, input) {
   const { source, answer, quote } = input
-  const inspected = await ctx.sessionController.inspect(source.parentSessionId)
+  const inspected = await inspectSession(ctx, source.parentSessionId)
   const event = inspected.events.find((candidate) => candidate.seq === source.parentSeq)
   if (event?.type !== 'assistant/message' || event.data?.message?.id !== source.parentMessageId || event.data?.turn !== source.parentTurn) {
     throw new Error('引用位置与母回答不匹配，请刷新后重试')
@@ -237,7 +247,7 @@ async function buildTree(ctx, rootSessionId) {
   const nodes = []
   for (const descendant of descendants) {
     if (descendant.kind !== 'child') continue
-    const inspected = await ctx.sessionController.inspect(descendant.id)
+    const inspected = await inspectSession(ctx, descendant.id)
     if (inspected.meta?.origin !== 'subagent' || inspected.meta?.parentSession !== descendant.parentId) continue
     const found = quoteFromEvents(inspected.events, inspected.inheritedEventCount)
     if (found === undefined || found.record.source.parentSessionId !== descendant.parentId) continue
@@ -291,6 +301,7 @@ export const __testing = {
   cleanCreateInput,
   createThread,
   formatInitialPrompt,
+  inspectSession,
   parseQuoteRecord,
   quoteFromEvents,
   textOf,

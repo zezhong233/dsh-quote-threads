@@ -166,10 +166,15 @@ test('creation uses a fresh continuable child and waits for its initial durable 
   let spec
   const ctx = {
     agents: { get: () => parent },
-    sessionController: {
-      inspect: async (id) => id === 'parent-session'
-        ? { events: [parentEvent], meta: { id: 'parent-session' } }
-        : { events: [{ seq: 0, type: 'user/message', data: { id: 'initial-message', content: spec.request.prompt } }] },
+    sessionController: {},
+    sessionQuery: {
+      readSession: async (id) => id === 'parent-session'
+        ? { events: [parentEvent], session: { id: 'parent-session' }, inheritedEventCount: 0 }
+        : {
+            events: [{ seq: 0, type: 'user/message', data: { id: 'initial-message', content: spec.request.prompt } }],
+            session: { id: 'child-session', origin: 'subagent', parentSession: 'parent-session' },
+            inheritedEventCount: 0,
+          },
     },
     subagents: {
       getProvider: (name) => name === 'spawn' ? { prepareContinuable: async () => ({}) } : undefined,
@@ -217,7 +222,14 @@ test('tree reconstruction keeps only plugin-owned descendants and their hierarch
         { kind: 'child', id: 'grandchild-session', parentId: 'child-session', depth: 2, activity: 'inactive', hasChildren: false },
       ],
     },
-    sessionController: { inspect: async (id) => inspections[id] },
+    sessionController: {},
+    sessionQuery: {
+      readSession: async (id) => ({
+        session: inspections[id].meta,
+        events: inspections[id].events,
+        inheritedEventCount: inspections[id].inheritedEventCount,
+      }),
+    },
   }
   const tree = await __testing.buildTree(ctx, 'parent-session')
   assert.equal(tree.contractVersion, 1)
