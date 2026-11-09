@@ -204,6 +204,14 @@ test('tree reconstruction keeps only plugin-owned descendants and their hierarch
   }
   const nestedPrompt = __testing.formatInitialPrompt(nestedInput)
   const inspections = {
+    'parent-session': {
+      events: [
+        { seq: 0, type: 'turn/start', data: { turn: 3 } },
+        { seq: 1, type: 'user/message', data: { turn: 3, source: { kind: 'subagent-settled', senderSessionId: 'child-session' }, content: [] } },
+        { seq: 2, type: 'turn/start', data: { turn: 4 } },
+        { seq: 3, type: 'user/message', data: { turn: 4, source: { kind: 'subagent-settled', senderSessionId: 'unrelated-child' }, content: [] } },
+      ],
+    },
     'child-session': {
       meta: { origin: 'subagent', parentSession: 'parent-session' },
       inheritedEventCount: 0,
@@ -233,9 +241,23 @@ test('tree reconstruction keeps only plugin-owned descendants and their hierarch
   }
   const tree = await __testing.buildTree(ctx, 'parent-session')
   assert.equal(tree.contractVersion, 1)
+  assert.deepEqual(tree.hiddenTurns, [3])
   assert.deepEqual(tree.nodes.map((node) => [node.childId, node.parentId, node.depth]), [
     ['child-session', 'parent-session', 1],
     ['grandchild-session', 'child-session', 2],
   ])
   assert.equal(tree.nodes[1].question, '嵌套问题')
+})
+
+test('settlement hiding excludes human and unrelated-subagent turns', () => {
+  const events = [
+    { type: 'turn/start', data: { turn: 7 } },
+    { type: 'user/message', data: { source: { kind: 'subagent-settled', senderSessionId: 'quote-child' } } },
+    { type: 'turn/start', data: { turn: 8 } },
+    { type: 'user/message', data: { source: { kind: 'user' } } },
+    { type: 'user/message', data: { source: { kind: 'subagent-settled', senderSessionId: 'quote-child' } } },
+    { type: 'turn/start', data: { turn: 9 } },
+    { type: 'user/message', data: { source: { kind: 'subagent-settled', senderSessionId: 'other-child' } } },
+  ]
+  assert.deepEqual(__testing.quoteSettlementTurns(events, new Set(['quote-child'])), [7])
 })

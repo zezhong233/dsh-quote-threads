@@ -241,6 +241,21 @@ async function createThread(ctx, input) {
   }
 }
 
+function quoteSettlementTurns(events, childIds) {
+  const settlements = new Set()
+  const humanTurns = new Set()
+  let currentTurn = 0
+  for (const event of events) {
+    if (event?.type === 'turn/start' && Number.isSafeInteger(event.data?.turn)) currentTurn = event.data.turn
+    if (event?.type !== 'user/message') continue
+    const source = event.data?.source
+    const turn = Number.isSafeInteger(event.data?.turn) ? event.data.turn : currentTurn
+    if (source?.kind === 'user') humanTurns.add(turn)
+    if (source?.kind === 'subagent-settled' && childIds.has(source.senderSessionId)) settlements.add(turn)
+  }
+  return [...settlements].filter((turn) => !humanTurns.has(turn))
+}
+
 async function buildTree(ctx, rootSessionId) {
   if (typeof rootSessionId !== 'string' || rootSessionId.trim() === '') throw new Error('sessionId is required')
   const descendants = await ctx.subagents.listDescendants(rootSessionId)
@@ -265,7 +280,9 @@ async function buildTree(ctx, rootSessionId) {
       question: found.record.question,
     })
   }
-  return { contractVersion: 1, rootSessionId, nodes }
+  const root = await inspectSession(ctx, rootSessionId)
+  const hiddenTurns = quoteSettlementTurns(root.events, new Set(nodes.map((node) => node.childId)))
+  return { contractVersion: 1, rootSessionId, nodes, hiddenTurns }
 }
 
 function route(ctx, path, operation) {
@@ -304,6 +321,7 @@ export const __testing = {
   inspectSession,
   parseQuoteRecord,
   quoteFromEvents,
+  quoteSettlementTurns,
   textOf,
   verifySource,
 }

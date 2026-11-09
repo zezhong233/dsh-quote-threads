@@ -13,7 +13,7 @@ window.__ModuleLoader__.load({
       useSyncExternalStore,
     } = React
     const NS = 'quote-threads'
-    const EMPTY_TREE = Object.freeze({ rootSessionId: '', nodes: [], loading: false, error: null, loaded: false })
+    const EMPTY_TREE = Object.freeze({ rootSessionId: '', nodes: [], hiddenTurns: [], loading: false, error: null, loaded: false })
     const EMPTY_EVENTS = Object.freeze({ entries: [], revision: 0 })
     const trees = new Map()
     const treeListeners = new Set()
@@ -434,8 +434,54 @@ window.__ModuleLoader__.load({
       )
     }
 
+    function turnRows(section) {
+      const current = section?.closest('[data-chat-turn]')
+      if (!current?.parentElement) return []
+      const turn = current.getAttribute('data-chat-turn')
+      return Array.from(current.parentElement.children).filter((row) => row.getAttribute('data-chat-turn') === turn)
+    }
+
+    function useHiddenQuoteTurn(ref, hidden) {
+      useEffect(() => {
+        if (!hidden || !ref.current) return undefined
+        const previous = new Map()
+        const apply = () => {
+          for (const row of turnRows(ref.current)) {
+            if (row.style.display === 'none') continue
+            previous.set(row, row.style.display)
+            row.style.display = 'none'
+          }
+        }
+        apply()
+        const list = ref.current?.closest('[data-chat-turn]')?.parentElement
+        const observer = list ? new window.MutationObserver(apply) : null
+        observer?.observe(list, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
+        return () => {
+          observer?.disconnect()
+          for (const [row, display] of previous) row.style.display = display
+        }
+      }, [ref, hidden])
+    }
+
     function QuoteTurnAction(props) {
-      return h('section', { className: 'qt-tail', 'data-quote-action-turn': props.turn },
+      const { seq, sessionId, useChat } = props
+      const chatSnapshot = useChat(useCallback((snapshot) => snapshot, []))
+      const tree = useTree(sessionId)
+      let parentTurn = null
+      try {
+        parentTurn = sourceFromChat(chatSnapshot, sessionId, seq).source.parentTurn
+      } catch {
+        parentTurn = null
+      }
+      const hidden = parentTurn !== null && (tree.hiddenTurns ?? []).includes(parentTurn)
+      const ref = useRef(null)
+      useHiddenQuoteTurn(ref, hidden)
+      useEffect(() => {
+        if (!tree.nodes.length) return undefined
+        const timer = window.setTimeout(() => void refreshTree(sessionId), 200)
+        return () => window.clearTimeout(timer)
+      }, [seq, sessionId, tree.nodes.length])
+      return h('section', { ref, className: 'qt-tail', 'data-quote-action-turn': props.turn, 'data-quote-settlement-turn': hidden ? 'true' : undefined },
         h(Style),
         h(QuoteAction, props),
       )

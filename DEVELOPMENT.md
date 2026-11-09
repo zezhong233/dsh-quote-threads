@@ -143,7 +143,15 @@ h(MarkdownText, {
 - [Verified 2026-11] Rebuild ranges through a `MutationObserver` because Chat virtualization and React updates can replace the original text nodes; delete owned highlights during effect cleanup.
 - [Verified 2026-11] Default each inline child card to a compact quoted-text summary and retain its child session only when that card is expanded, preventing a long answer with many quotes from mounting every conversation at once.
 
-## 11. Verification and publication checklist
+## 11. Hide automatic parent feedback from quote children
+
+- [Verified 2026-11] Initial `startActivation({ delivery: 'caller' })` suppresses settlement notices, but the DSH cold-resume path materializes a later follow-up without a delivery override and therefore uses the manager's default `parent` delivery.
+- [Verified 2026-11] Settlement notices are durable `user/message` events with `source.kind === 'subagent-settled'` and `source.senderSessionId`; filter these IDs through the recovered quote tree instead of hiding every subagent notification.
+- [Verified 2026-11] Hide only turns containing a quote-child settlement and no ordinary `source.kind === 'user'` message, so a notification steered into a manual turn cannot hide the user's own question and answer.
+- [Verified 2026-11] Return the filtered turn numbers from the Host tree, map each Client turn-tail through exact `seq`, and hide its actual sibling Chat rows while preserving prior inline styles and restoring them on cleanup.
+- [Verified 2026-11] This is a presentation filter, not log deletion or a change to DSH settlement semantics; complete child conversations remain available through the native session view.
+
+## 12. Verification and publication checklist
 
 - [Verified 2026-11] Run syntax checks, Host tests, JSON parsing, and `git diff --check` before every install or commit.
 
