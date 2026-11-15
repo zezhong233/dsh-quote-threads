@@ -154,9 +154,11 @@ h(MarkdownText, {
 ## 12. Enter a quote directly from the selection
 
 - [Verified 2026-11] Delegate `mouseup` and keyboard-selection `keyup` events on the current Chat turn list, defer selection reading by one task, and accept only selections whose anchor and focus both belong to assistant-response rows.
-- [Verified 2026-11] Direct capture is quiet for collapsed or cross-turn selections; the existing answer-action button remains as an explicit fallback and still reports errors.
+- [Verified 2026-11] Selection alone shows only a small nearby `引用文本` action; it does not open a composer. Clicking that action creates an inline-mode draft, while the existing answer-action button creates a branch-mode draft and retains explicit error reporting.
+- [Verified 2026-11] Inline mode formats the exact turn, sequence, message, and character offsets with the quote and question, then uses the native `inputActions.setDraft()` plus `inputActions.submit()` to send an ordinary turn in the current Session without creating a child.
+- [Verified 2026-11] Branch mode continues through the Host create route and persistent continuable child; inline and branch modes do not share submission logic.
 - [Verified 2026-11] Represent the current draft as a temporary named CSS Highlight with a business-blue background, independent of the native selection that collapses when the composer receives focus.
-- [Verified 2026-11] Reuse the same text/TeX range reconstruction for draft and persisted highlights; clearing the draft removes the blue highlight, while submitted quotes retain their colored underlines.
+- [Verified 2026-11] Reuse the same text/TeX range reconstruction for draft and persisted highlights; sending or cancelling clears blue, while branch submissions retain their colored underlines.
 
 ## 13. Verification and publication checklist
 
