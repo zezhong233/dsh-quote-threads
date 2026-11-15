@@ -18,7 +18,7 @@ const api = definition.factory((name) => {
   if (name === '@deepseek-ai/dsh-client-ui-primitives') return { MarkdownText: () => null }
   throw new Error(`Unexpected module: ${name}`)
 })
-const { selectionText, quoteParts, highlightName, quoteOccurrence, quoteColor } = api.__testing
+const { selectionText, selectionInRows, quoteParts, highlightName, quoteOccurrence, quoteColor } = api.__testing
 
 function text(value) {
   return { nodeType: 3, nodeValue: value }
@@ -90,6 +90,18 @@ test('quote occurrence follows the stored answer offset', () => {
   const node = { quote, source: { start, end: start + quote.length } }
   assert.equal(quoteOccurrence(answer, node), 1)
   assert.equal(quoteOccurrence(answer, { quote, source: { start: null, end: null } }), 0)
+})
+
+test('direct quote selection stays within assistant answer rows', () => {
+  const anchor = {}
+  const focus = {}
+  const first = { contains: (node) => node === anchor }
+  const second = { contains: (node) => node === focus }
+  const selection = { rangeCount: 1, isCollapsed: false, anchorNode: anchor, focusNode: focus }
+  assert.equal(selectionInRows(selection, [first, second]), true)
+  assert.equal(selectionInRows(selection, [first]), false)
+  assert.equal(selectionInRows({ ...selection, isCollapsed: true }, [first, second]), false)
+  assert.equal(selectionInRows(null, [first, second]), false)
 })
 
 test('quote colors provide an ordered eight-color cycle', () => {

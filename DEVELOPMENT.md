@@ -151,7 +151,14 @@ h(MarkdownText, {
 - [Verified 2026-11] Return the filtered turn numbers from the Host tree, map each Client turn-tail through exact `seq`, and hide its actual sibling Chat rows while preserving prior inline styles and restoring them on cleanup.
 - [Verified 2026-11] This is a presentation filter, not log deletion or a change to DSH settlement semantics; complete child conversations remain available through the native session view.
 
-## 12. Verification and publication checklist
+## 12. Enter a quote directly from the selection
+
+- [Verified 2026-11] Delegate `mouseup` and keyboard-selection `keyup` events on the current Chat turn list, defer selection reading by one task, and accept only selections whose anchor and focus both belong to assistant-response rows.
+- [Verified 2026-11] Direct capture is quiet for collapsed or cross-turn selections; the existing answer-action button remains as an explicit fallback and still reports errors.
+- [Verified 2026-11] Represent the current draft as a temporary named CSS Highlight with a business-blue background, independent of the native selection that collapses when the composer receives focus.
+- [Verified 2026-11] Reuse the same text/TeX range reconstruction for draft and persisted highlights; clearing the draft removes the blue highlight, while submitted quotes retain their colored underlines.
+
+## 13. Verification and publication checklist
 
 - [Verified 2026-11] Run syntax checks, Host tests, JSON parsing, and `git diff --check` before every install or commit.
 
