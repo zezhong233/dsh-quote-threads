@@ -30,14 +30,12 @@ window.__ModuleLoader__.load({
         title: '引用地图',
         description: '查看当前会话的引用追问。主线只显示第 0 级问答，子问答按需展开。',
         quoteAsk: '引用追问',
-        inlineQuote: '引用文本',
-        inlineAsk: '在主对话追问',
         selectFirst: '请先在当前回答中选择一段文字',
         wrongTurn: '选区不在当前回答里，请重新选择',
         emptySelection: '没有选中可引用的文字',
         sourceNotFinal: '这条回答还没有可引用的完成消息',
         sourceNotFound: '找不到这条回答的位置，请刷新后重试',
-        selectedText: '引用文本',
+        selectedText: '选中原文',
         questionPlaceholder: '针对这段文字提问…',
         ask: '开始追问',
         asking: '创建子问答…',
@@ -64,7 +62,7 @@ window.__ModuleLoader__.load({
         footnotes: '脚注',
         session: '会话',
         noSession: '没有可查看的会话',
-        emptyMap: '这个会话还没有引用分支。选中文字后点「引用文本」会在当前对话追问；回答底部的「引用追问」会创建独立分支。',
+        emptyMap: '这个会话还没有引用追问。选中回答中的文字，然后点回答操作区的引用按钮即可创建。',
         retry: '重试',
         loadError: '读取失败',
         createError: '创建引用追问失败',
@@ -77,14 +75,12 @@ window.__ModuleLoader__.load({
         title: 'Quote map',
         description: 'Browse quoted follow-ups. The main conversation stays at level 0 until a thread is expanded.',
         quoteAsk: 'Quote & ask',
-        inlineQuote: 'Quoted text',
-        inlineAsk: 'Ask in this conversation',
         selectFirst: 'Select text in this answer first',
         wrongTurn: 'The selection is outside this answer',
         emptySelection: 'There is no selected text to quote',
         sourceNotFinal: 'This answer has no finalized message to quote yet',
         sourceNotFound: 'Could not locate this answer. Reload and try again',
-        selectedText: 'Quoted text',
+        selectedText: 'Selected text',
         questionPlaceholder: 'Ask about this passage…',
         ask: 'Ask',
         asking: 'Creating thread…',
@@ -111,7 +107,7 @@ window.__ModuleLoader__.load({
         footnotes: 'Footnotes',
         session: 'Session',
         noSession: 'No session is available',
-        emptyMap: 'No quote branches yet. Use the small Quoted text action for an inline follow-up, or the answer action to create a branch.',
+        emptyMap: 'No quoted threads yet. Select answer text and use the quote action below that answer.',
         retry: 'Retry',
         loadError: 'Could not read threads',
         createError: 'Could not create the quoted thread',
@@ -139,7 +135,6 @@ window.__ModuleLoader__.load({
       .qt-button-primary{background:var(--dsw-alias-interactive-bg-hover)}
       .qt-error{color:var(--dsw-alias-state-error-primary);font-size:12px;white-space:pre-wrap}
       .qt-tail{box-sizing:border-box;width:100%;margin:8px 0 4px}
-      .qt-selection-offer{position:fixed;z-index:1000;transform:translateY(-100%);padding:5px 9px;border:1px solid color-mix(in srgb,var(--dsw-alias-state-business-primary) 32%,transparent);border-radius:6px;background:var(--dsw-alias-surface-primary);color:var(--dsw-alias-state-business-primary);box-shadow:0 4px 16px rgba(0,0,0,.18);font-size:12px;line-height:18px;white-space:nowrap;cursor:pointer}
       .qt-disclosure{border:0;background:transparent;color:var(--dsw-alias-label-secondary);padding:4px 0;font:inherit;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
       .qt-disclosure:hover{color:var(--dsw-alias-label-primary)}
       .qt-quote-action{border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-weight:600;padding:6px 12px}
@@ -405,89 +400,26 @@ window.__ModuleLoader__.load({
       return source
     }
 
-    function inlinePrompt(draft, question) {
-      const { source } = draft
-      return [
-        '【引用文本】',
-        `位置：turn=${source.parentTurn}，seq=${source.parentSeq}，message=${source.parentMessageId}，字符=${source.start ?? '?'}–${source.end ?? '?'}`,
-        draft.quote,
-        '【追问】',
-        question.trim(),
-      ].join('\n\n')
-    }
-
-    function selectionInRows(selection, rows) {
-      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return false
-      return rows.some((row) => row.contains(selection.anchorNode)) && rows.some((row) => row.contains(selection.focusNode))
-    }
-
-    function useQuoteSelectionOffer(ref, readSelection, disabled) {
-      const [offer, setOffer] = useState(null)
-      const clearOffer = useCallback(() => setOffer(null), [])
-      useEffect(() => {
-        if (disabled) {
-          clearOffer()
-          return undefined
+    function QuoteAction({ seq, sessionId, useChat, t }) {
+      const [error, setError] = useState('')
+      const chatSnapshot = useChat(useCallback((snapshot) => snapshot, []))
+      const capture = () => {
+        setError('')
+        try {
+          const selected = captureSelection(sourceFromChat(chatSnapshot, sessionId, seq))
+          setDraft(sessionId, selected)
+        } catch (cause) {
+          const key = cause instanceof Error ? cause.message : ''
+          setError(key in dictionaries.zh ? t(key) : key || t('selectionOutOfAnswer'))
         }
-        const list = ref.current?.closest('[data-chat-turn]')?.parentElement
-        if (!list) return undefined
-        let timer = 0
-        const show = () => {
-          const selection = window.getSelection()
-          if (!selectionInRows(selection, quoteRows(ref.current))) {
-            clearOffer()
-            return
-          }
-          try {
-            const selected = readSelection()
-            const rect = selection.getRangeAt(0).getBoundingClientRect()
-            setOffer({
-              selected,
-              left: Math.max(8, Math.min(rect.left, window.innerWidth - 120)),
-              top: Math.max(36, rect.top - 8),
-            })
-          } catch {
-            clearOffer()
-          }
-        }
-        const schedule = (event) => {
-          if (event.target.closest?.('.qt-selection-offer')) return
-          if (event.type === 'mouseup' && event.button !== 0) return
-          if (event.type === 'keyup' && event.key !== 'Shift' && !event.shiftKey) return
-          window.clearTimeout(timer)
-          timer = window.setTimeout(show, 0)
-        }
-        const selectionChanged = () => {
-          if (!selectionInRows(window.getSelection(), quoteRows(ref.current))) clearOffer()
-        }
-        const keydown = (event) => {
-          if (event.key === 'Escape') clearOffer()
-        }
-        list.addEventListener('mouseup', schedule)
-        list.addEventListener('keyup', schedule)
-        document.addEventListener('selectionchange', selectionChanged)
-        document.addEventListener('scroll', clearOffer, true)
-        document.addEventListener('keydown', keydown)
-        return () => {
-          window.clearTimeout(timer)
-          list.removeEventListener('mouseup', schedule)
-          list.removeEventListener('keyup', schedule)
-          document.removeEventListener('selectionchange', selectionChanged)
-          document.removeEventListener('scroll', clearOffer, true)
-          document.removeEventListener('keydown', keydown)
-        }
-      }, [ref, readSelection, disabled, clearOffer])
-      return [offer, clearOffer]
-    }
-
-    function QuoteAction({ capture, error, t }) {
+      }
       const onMouseDown = (event) => {
         if (event.button !== 0) return
         event.preventDefault()
         capture()
       }
       const onClick = (event) => {
-        if (event.detail === 0) capture(false)
+        if (event.detail === 0) capture()
       }
       return h(React.Fragment, null,
         h('button', {
@@ -532,10 +464,9 @@ window.__ModuleLoader__.load({
     }
 
     function QuoteTurnAction(props) {
-      const { seq, sessionId, useChat, t } = props
+      const { seq, sessionId, useChat } = props
       const chatSnapshot = useChat(useCallback((snapshot) => snapshot, []))
       const tree = useTree(sessionId)
-      const [error, setError] = useState('')
       let parentTurn = null
       try {
         parentTurn = sourceFromChat(chatSnapshot, sessionId, seq).source.parentTurn
@@ -544,20 +475,6 @@ window.__ModuleLoader__.load({
       }
       const hidden = parentTurn !== null && (tree.hiddenTurns ?? []).includes(parentTurn)
       const ref = useRef(null)
-      const draft = useDraft(sessionId)
-      const readSelection = useCallback(() => captureSelection(sourceFromChat(chatSnapshot, sessionId, seq)), [chatSnapshot, sessionId, seq])
-      const [offer, clearOffer] = useQuoteSelectionOffer(ref, readSelection, Boolean(draft))
-      const capture = useCallback(() => {
-        setError('')
-        try {
-          const selected = readSelection()
-          clearOffer()
-          setDraft(sessionId, { ...selected, mode: 'branch' })
-        } catch (cause) {
-          const key = cause instanceof Error ? cause.message : ''
-          setError(key in dictionaries.zh ? t(key) : key || t('selectionOutOfAnswer'))
-        }
-      }, [readSelection, clearOffer, sessionId, t])
       useHiddenQuoteTurn(ref, hidden)
       useEffect(() => {
         if (!tree.nodes.length) return undefined
@@ -566,26 +483,11 @@ window.__ModuleLoader__.load({
       }, [seq, sessionId, tree.nodes.length])
       return h('section', { ref, className: 'qt-tail', 'data-quote-action-turn': props.turn, 'data-quote-settlement-turn': hidden ? 'true' : undefined },
         h(Style),
-        h(QuoteAction, { capture, error, t }),
-        offer ? h('button', {
-          type: 'button',
-          className: 'qt-selection-offer',
-          style: { left: offer.left, top: offer.top },
-          onMouseDown: (event) => {
-            event.preventDefault()
-            event.stopPropagation()
-          },
-          onMouseUp: (event) => event.stopPropagation(),
-          onClick: (event) => {
-            event.stopPropagation()
-            clearOffer()
-            setDraft(sessionId, { ...offer.selected, mode: 'inline' })
-          },
-        }, t('inlineQuote')) : null,
+        h(QuoteAction, props),
       )
     }
 
-    function QuoteComposer({ sessionId, inputActions, pluginCtx: ctx, t }) {
+    function QuoteComposer({ sessionId, pluginCtx: ctx, t }) {
       const draft = useDraft(sessionId)
       const [question, setQuestion] = useState('')
       const [busy, setBusy] = useState(false)
@@ -605,12 +507,6 @@ window.__ModuleLoader__.load({
         setBusy(true)
         setError('')
         try {
-          if (draft.mode === 'inline') {
-            inputActions.setDraft(inlinePrompt(draft, question))
-            inputActions.submit()
-            setDraft(sessionId, null)
-            return
-          }
           await call('/ext/quote-threads/create', { ...draft, question: question.trim() })
           setExpanded(`${sessionId}:seq:${draft.source.parentSeq}`, true)
           setDraft(sessionId, null)
@@ -650,7 +546,7 @@ window.__ModuleLoader__.load({
         h('div', { className: 'qt-row' },
           h('div', { className: 'qt-spacer' }),
           h('button', { type: 'button', className: 'qt-button', disabled: busy, onClick: () => setDraft(sessionId, null) }, t('cancel')),
-          h('button', { type: 'button', className: 'qt-button qt-button-primary', disabled: busy || !question.trim(), onClick: () => void submit() }, busy ? t('asking') : draft.mode === 'inline' ? t('inlineAsk') : t('ask')),
+          h('button', { type: 'button', className: 'qt-button qt-button-primary', disabled: busy || !question.trim(), onClick: () => void submit() }, busy ? t('asking') : t('ask')),
         ),
       )
     }
@@ -974,7 +870,6 @@ window.__ModuleLoader__.load({
       const catalog = useProjection('subagentCatalog')
       const chatSnapshot = useChat(useCallback((snapshot) => snapshot, []))
       const tree = useTree(sessionId)
-      const draft = useDraft(sessionId)
       const key = `${sessionId}:seq:${seq}`
       const open = useExpanded(key)
       const nodes = tree.nodes.filter((node) => node.parentId === sessionId && node.source.parentSeq === seq)
@@ -985,12 +880,6 @@ window.__ModuleLoader__.load({
         answer = ''
       }
       const highlightNodes = nodes.map((node) => ({ ...node, highlightOccurrence: quoteOccurrence(answer, node) }))
-      const activeDraft = draft?.source.parentSeq === seq ? {
-        ...draft,
-        id: `quote-draft-${sessionId}-${seq}`,
-        highlightOccurrence: quoteOccurrence(answer, draft),
-      } : null
-      if (activeDraft) highlightNodes.push(activeDraft)
       const tailRef = useRef(null)
       useQuoteHighlights(tailRef, highlightNodes)
       useEffect(() => {
@@ -999,16 +888,15 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         if (catalog !== undefined) void refreshTree(sessionId)
       }, [catalog, sessionId])
-      if (!nodes.length && !activeDraft) return null
+      if (!nodes.length) return null
       const highlightStyles = nodes.map((node, index) => `::highlight(${highlightName(node.id)}){text-decoration-line:underline;text-decoration-color:${quoteColor(index)};text-decoration-thickness:2px;text-underline-offset:3px}`).join('\n')
-      const activeStyle = activeDraft ? `::highlight(${highlightName(activeDraft.id)}){background-color:color-mix(in srgb, var(--dsw-alias-state-business-primary) 24%, transparent);color:var(--dsw-alias-label-primary);text-decoration-line:none}` : ''
       return h('section', { className: 'qt-tail', ref: tailRef },
-        h('style', null, `${highlightStyles}\n${activeStyle}`),
+        h('style', null, highlightStyles),
         h(Style),
-        nodes.length ? h('button', { type: 'button', className: 'qt-disclosure', 'aria-expanded': open, onClick: () => setExpanded(key, !open) },
+        h('button', { type: 'button', className: 'qt-disclosure', 'aria-expanded': open, onClick: () => setExpanded(key, !open) },
           h('span', null, open ? '▾' : '▸'),
           `${nodes.length} ${t('threads')}`,
-        ) : null,
+        ),
         open ? h('div', { className: 'qt-thread-list' }, nodes.map((node, index) => h(ChildThread, { key: node.childId, node, rootSessionId: sessionId, pluginCtx: ctx, t, color: quoteColor(index) }))) : null,
       )
     }
@@ -1067,7 +955,7 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      __testing: { selectionText, serializeSelectionNode, selectionInRows, inlinePrompt, quoteParts, highlightHash, highlightName, quoteOccurrence, quoteColor },
+      __testing: { selectionText, serializeSelectionNode, quoteParts, highlightHash, highlightName, quoteOccurrence, quoteColor },
       inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'locale'],
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, dictionaries), 'quote-threads: dictionaries')

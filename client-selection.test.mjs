@@ -18,7 +18,7 @@ const api = definition.factory((name) => {
   if (name === '@deepseek-ai/dsh-client-ui-primitives') return { MarkdownText: () => null }
   throw new Error(`Unexpected module: ${name}`)
 })
-const { selectionText, selectionInRows, inlinePrompt, quoteParts, highlightName, quoteOccurrence, quoteColor } = api.__testing
+const { selectionText, quoteParts, highlightName, quoteOccurrence, quoteColor } = api.__testing
 
 function text(value) {
   return { nodeType: 3, nodeValue: value }
@@ -90,31 +90,6 @@ test('quote occurrence follows the stored answer offset', () => {
   const node = { quote, source: { start, end: start + quote.length } }
   assert.equal(quoteOccurrence(answer, node), 1)
   assert.equal(quoteOccurrence(answer, { quote, source: { start: null, end: null } }), 0)
-})
-
-test('direct quote selection stays within assistant answer rows', () => {
-  const anchor = {}
-  const focus = {}
-  const first = { contains: (node) => node === anchor }
-  const second = { contains: (node) => node === focus }
-  const selection = { rangeCount: 1, isCollapsed: false, anchorNode: anchor, focusNode: focus }
-  assert.equal(selectionInRows(selection, [first, second]), true)
-  assert.equal(selectionInRows(selection, [first]), false)
-  assert.equal(selectionInRows({ ...selection, isCollapsed: true }, [first, second]), false)
-  assert.equal(selectionInRows(null, [first, second]), false)
-})
-
-test('inline prompt carries exact source coordinates and quoted text', () => {
-  const prompt = inlinePrompt({
-    quote: '被引用的原文',
-    source: { parentTurn: 4, parentSeq: 17, parentMessageId: 'message-2', start: 8, end: 14 },
-  }, '  解释这一段  ')
-  assert.match(prompt, /turn=4/)
-  assert.match(prompt, /seq=17/)
-  assert.match(prompt, /message=message-2/)
-  assert.match(prompt, /字符=8–14/)
-  assert.match(prompt, /被引用的原文/)
-  assert.match(prompt, /解释这一段/)
 })
 
 test('quote colors provide an ordered eight-color cycle', () => {
